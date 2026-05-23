@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.dot-pattern {
+  background-image: radial-gradient(circle, #d8d0c8 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.sensor-dot.cursor-grab,
+.device-dot.cursor-grab {
+  cursor: grab;
+}
+
+.sensor-dot {
+  fill: #5b8fc7;
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
+.device-dot {
+  fill: #e08850;
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
+.sensor-dot.ativo,
+.device-icon.ativo,
+.device-dot.ativo,
+.morador-marker.ativo circle {
+  filter: drop-shadow(0 0 6px #e08850);
+}
+
+.morador-marker {
+  pointer-events: none;
+  transition: transform 0.4s ease;
+}

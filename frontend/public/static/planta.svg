@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" role="img" aria-label="Planta da casa Hemera">
+  <defs>
+    <style>
+      .comodo-rect { fill: #f6f0e8; stroke: #c2652a; stroke-width: 2; }
+      .sensor-dot { fill: #78706a; opacity: 0.85; }
+      .sensor-dot.ativo { fill: #c2652a; opacity: 1; filter: drop-shadow(0 0 4px #e08850); }
+      .device-icon { fill: #8c3c3c; opacity: 0.75; }
+      .device-icon.ativo { fill: #d47070; opacity: 1; filter: drop-shadow(0 0 4px #d47070); }
+      .room-name { fill: #3a302a; font-family: Manrope, sans-serif; font-size: 12px; font-weight: 700; }
+      .planta-title { fill: #605850; font-family: "EB Garamond", serif; font-size: 16px; font-weight: 600; }
+      .legend-text { fill: #605850; font-family: Manrope, sans-serif; font-size: 10px; }
+    </style>
+  </defs>
+
+  <rect width="800" height="520" fill="#faf5ee" rx="8"/>
+
+  <text class="planta-title" x="400" y="32" text-anchor="middle">HEMERA — Planta da Casa</text>
+
+  <g id="comodo_quarto_maria">
+    <rect class="comodo-rect" x="30" y="48" width="170" height="120" rx="6"/>
+    <text class="room-name" x="115" y="72" text-anchor="middle">Quarto Maria</text>
+    <circle class="sensor-dot" id="s_qm_presenca" cx="60" cy="98" r="6"/>
+    <circle class="sensor-dot" id="s_qm_iluminancia" cx="90" cy="98" r="6"/>
+    <circle class="sensor-dot" id="s_qm_abertura" cx="120" cy="98" r="6"/>
+    <rect class="device-icon" id="d_qm_lampada" x="53" y="118" width="12" height="12" rx="2"/>
+    <rect class="device-icon" id="d_qm_cortina" x="83" y="118" width="12" height="12" rx="2"/>
+    <rect class="device-icon" id="d_qm_difusor" x="113" y="118" width="12" height="12" rx="2"/>
+  </g>
+
+  <g id="comodo_quarto_pedro_maria">
+    <rect class="comodo-rect" x="220" y="48" width="170" height="120" rx="6"/>
+    <text class="room-name" x="305" y="72" text-anchor="middle">Quarto Pedro e Maria</text>
+    <circle class="sensor-dot" id="s_qpm_presenca" cx="250" cy="98" r="6"/>
+    <circle class="sensor-dot" id="s_qpm_iluminancia" cx="280" cy="98" r="6"/>
+    <circle class="sensor-dot" id="s_qpm_temperatura" cx="310" cy="98" r="6"/>
+    <rect class="device-icon" id="d_qpm_lampada" x="243" y="118" width="12" height="12" rx="2"/>
+    <rect class="device-icon" id="d_qpm_cortina" x="273" y="118" width="12" height="12" rx="2"/>
+    <rect class="device-icon" id="d_qpm_ac" x="303" y="118" width="12" height="12" rx="2"/>
+  </g>
+
+  <g id="comodo_quarto_lucas">
+    <rect class="comodo-rect" x="410" y="48" width="160" height="120" rx="6"/>
+    <text class="room-name" x="490" y="72" text-anchor="middle">Quarto Lucas</text>
+    <circle class="sensor-dot" id="s_ql_presenca" cx="440" cy="98" r="6"/>
+    <circle class="sensor-dot" id="s_ql_iluminancia" cx="466" cy="98" r="6"/>
+    <circle class="sensor-dot" id="s_ql_abertura" cx="492" cy="98" r="6"/>
+    <circle class="sensor-dot" id="s_ql_temperatura" cx="518" cy="98" r="6"/>
+    <rect class="device-icon" id="d_ql_lampada" x="458" y="118" width="12" height="12" rx="2"/>
+    <rect class="device-icon" id="d_ql_cortina" x="486" y="118" width="12" height="12" rx="2"/>
+  </g>
+
+  <g id="comodo_escritorio">
+    <rect class="comodo-rect" x="590" y="48" width="180" height="120" rx="6"/>
+    <text class="room-name" x="680" y="72" text-anchor="middle">Escritório</text>
+    <circle class="sensor-dot" id="s_esc_presenca" cx="630" cy="98" r="6"/>
+    <circle class="sensor-dot" id="s_esc_iluminancia" cx="660" cy="98" r="6"/>
+    <circle class="sensor-dot" id="s_esc_temperatura" cx="690" cy="98" r="6"/>
+    <rect class="device-icon" id="d_esc_lampada" x="623" y="118" width="12" height="12" rx="2"/>
+    <rect class="device-icon" id="d_esc_ac" x="653" y="118" width="12" height="12" rx="2"/>
+    <rect class="device-icon" id="d_esc_alto_falante" x="683" y="118" width="12" height="12" rx="2"/>
+  </g>
+
+  <g id="comodo_sala">
+    <rect class="comodo-rect" x="30" y="188" width="250" height="165" rx="6"/>
+    <text class="room-name" x="155" y="212" text-anchor="middle">Sala</text>
+    <circle class="sensor-dot" id="s_sala_presenca" cx="80" cy="252" r="6"/>
+    <circle class="sensor-dot" id="s_sala_decibel" cx="115" cy="252" r="6"/>
+    <circle class="sensor-dot" id="s_sala_iluminancia" cx="150" cy="252" r="6"/>
+    <circle class="sensor-dot" id="s_sala_temperatura" cx="185" cy="252" r="6"/>
+    <rect class="device-icon" id="d_sala_lampada" x="73" y="278" width="12" height="12" rx="2"/>
+    <rect class="device-icon" id="d_sala_cortina" x="108" y="278" width="12" height="12" rx="2"/>
+    <rect class="device-icon" id="d_sala_alto_falante" x="143" y="278" width="12" height="12" rx="2"/>
+  </g>
+
+  <g id="comodo_cozinha">
+    <rect class="comodo-rect" x="300" y="188" width="195" height="165" rx="6"/>
+    <text class="room-name" x="397" y="212" text-anchor="middle">Cozinha</text>
+    <circle class="sensor-dot" id="s_coz_presenca" cx="340" cy="252" r="6"/>
+    <circle class="sensor-dot" id="s_coz_fluxo" cx="375" cy="252" r="6"/>
+    <circle class="sensor-dot" id="s_coz_consumo" cx="410" cy="252" r="6"/>
+    <rect class="device-icon" id="d_coz_lampada" x="357" y="278" width="12" height="12" rx="2"/>
+    <rect class="device-icon" id="d_coz_alto_falante" x="390" y="278" width="12" height="12" rx="2"/>
+  </g>
+
+  <g id="comodo_banheiro">
+    <rect class="comodo-rect" x="515" y="188" width="255" height="165" rx="6"/>
+    <text class="room-name" x="642" y="212" text-anchor="middle">Banheiro</text>
+    <circle class="sensor-dot" id="s_ban_fluxo" cx="565" cy="252" r="6"/>
+    <circle class="sensor-dot" id="s_ban_presenca" cx="600" cy="252" r="6"/>
+    <circle class="sensor-dot" id="s_ban_umidade" cx="635" cy="252" r="6"/>
+    <rect class="device-icon" id="d_ban_lampada" x="582" y="278" width="12" height="12" rx="2"/>
+    <rect class="device-icon" id="d_ban_aquecedor" x="617" y="278" width="12" height="12" rx="2"/>
+  </g>
+
+  <g transform="translate(30, 375)">
+    <text class="legend-text" y="0" font-weight="700">Legenda</text>
+    <circle cx="8" cy="16" r="5" class="sensor-dot"/>
+    <text class="legend-text" x="20" y="20">Sensor</text>
+    <circle cx="8" cy="34" r="5" fill="#c2652a"/>
+    <text class="legend-text" x="20" y="38">Sensor ativo (leitura)</text>
+    <rect x="2" y="46" width="10" height="10" rx="2" class="device-icon"/>
+    <text class="legend-text" x="20" y="56">Dispositivo</text>
+    <rect x="2" y="62" width="10" height="10" rx="2" fill="#d47070"/>
+    <text class="legend-text" x="20" y="72">Dispositivo acionado</text>
+  </g>
+</svg>
