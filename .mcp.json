@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "code-review-graph": {
+      "command": "code-review-graph",
+      "args": [
+        "serve",
+        "--repo",
+        "/var/home/ignical/Documents/4_Testes/hemera",
+        "--tools",
+        "get_minimal_context_tool,semantic_search_nodes_tool,query_graph_tool,detect_changes_tool,get_impact_radius_tool,get_review_context_tool,list_graph_stats_tool,build_or_update_graph_tool"
+      ]
+    }
+  }
+}
