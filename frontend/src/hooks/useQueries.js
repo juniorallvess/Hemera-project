@@ -14,7 +14,10 @@ export function useQueries() {
 
     try {
       const res = await fetch(`/api/consultas/q${n}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || `Consulta Q${n} falhou (${res.status})`);
+      }
       setResult(data);
     } catch (e) {
       setError(e.message);

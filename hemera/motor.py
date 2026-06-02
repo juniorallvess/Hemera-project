@@ -1,25 +1,20 @@
 """Motor de detecção de desvios e disparo de intervenções."""
 import asyncio
 import logging
-import math
 import random
 import time
 from datetime import datetime, timedelta
 
 from hemera.baseline import salvar_baseline
-from hemera.config import MOTOR_INTERVAL_SECONDS
-from hemera.database import fetchall, fetchone
+from hemera.config import (MOTOR_INTERVAL_SECONDS, SEED, SIGMA_THRESHOLD,
+                           JANELA_DETECCAO_MINUTOS, PROB_CANCELAMENTO,
+                           AVALIACAO_TIMEOUT_REAL, BASELINE_JANELA_DIAS)
+from hemera.database import fetchall, fetchone, usar_conexao_unica
 from hemera.intervencoes import (ajustar_peso, executar_intervencao,
                                   registrar_reacao, verificar_e_criar_bloqueio,
                                   cancelar_intervencao_simulada)
 
 log = logging.getLogger(__name__)
-
-SIGMA_THRESHOLD = 2.0    # desvio > 2σ dispara detecção
-JANELA_ULTIMA_HORA = 60  # minutos
-PROB_CANCELAMENTO = 0.15 # 15% das intervenções são canceladas pelo morador
-# Em simulação batch o relógio simulado congela; avaliar após N segundos reais
-AVALIACAO_TIMEOUT_REAL = 8
 
 # Intervenções aguardando avaliação de reação
 # intervencao_id -> {morador_id, cena_id, comodo_id, desvio_id, avaliar_apos}
@@ -48,22 +43,25 @@ def _stats_ultima_hora(comodo_id: int, tipo: str,
         JOIN sensores s   ON l.sensor_id = s.id
         JOIN tipos_sensor ts ON s.tipo_sensor_id = ts.id
         WHERE s.comodo_id = ? AND ts.codigo = ?
-          AND l.registrado_em >= DATETIME(?, '-60 minutes')
+          AND l.registrado_em >= DATETIME(?, ?)
           AND l.registrado_em <= ?
-    """, (comodo_id, tipo, ref, ref))
+    """, (comodo_id, tipo, ref, f"-{JANELA_DETECCAO_MINUTOS} minutes", ref))
     if not row or row["media"] is None or row["n"] == 0:
         return None
     return (row["media"], row["n"])
 
 
-def detectar_desvios() -> list[int]:
+def detectar_desvios(ref_ts: str | None = None) -> list[int]:
     """
     Compara média última hora vs baseline para cada morador×cômodo×métrica.
     INSERT em desvios_detectados quando intensidade > SIGMA_THRESHOLD.
     Retorna lista de desvio_ids inseridos.
     """
+    global _ultimo_ts_detectado
     moradores = fetchall("SELECT id FROM moradores")
-    agora = _tempo_simulado_atual() or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    agora = ref_ts or _tempo_simulado_atual() or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if ref_ts is None and _ultimo_ts_detectado is not None and agora <= _ultimo_ts_detectado:
+        return []
     desvios_inseridos: list[int] = []
 
     for m in moradores:
@@ -72,8 +70,9 @@ def detectar_desvios() -> list[int]:
             SELECT b.id, b.comodo_id, b.metrica, b.valor_medio, b.desvio_padrao
             FROM baselines b
             WHERE b.morador_id = ?
+              AND b.hora = CAST(strftime('%H', ?) AS INTEGER)
             ORDER BY b.calculado_em DESC
-        """, (mid,))
+        """, (mid, agora))
 
         vistos: set[tuple] = set()
         for b in baselines:
@@ -82,15 +81,14 @@ def detectar_desvios() -> list[int]:
                 continue
             vistos.add(chave)
 
-            stats = _stats_ultima_hora(b["comodo_id"], b["metrica"])
+            stats = _stats_ultima_hora(b["comodo_id"], b["metrica"], agora)
             if stats is None:
                 continue
             media_atual, n_amostras = stats
 
             dp = b["desvio_padrao"] or 0.1
-            # t-statistic: compara média observada vs baseline usando erro padrão
-            se = dp / math.sqrt(max(n_amostras, 1))
-            intensidade = abs(media_atual - b["valor_medio"]) / se
+            # z-score do valor: quantos desvios-padrão a média recente está do baseline.
+            intensidade = abs(media_atual - b["valor_medio"]) / dp
 
             if intensidade > SIGMA_THRESHOLD:
                 with __import__("hemera.database", fromlist=["get_connection"]).get_connection() as conn:
@@ -105,15 +103,17 @@ def detectar_desvios() -> list[int]:
                          desvio_id, mid, b["comodo_id"], b["metrica"], intensidade)
                 desvios_inseridos.append(desvio_id)
 
+    if ref_ts is None:
+        _ultimo_ts_detectado = agora
     return desvios_inseridos
 
 
-def resolver_cena(morador_id: int, comodo_id: int) -> int | None:
+def resolver_cena(morador_id: int, comodo_id: int, ref_ts: str | None = None) -> int | None:
     """
     Escolhe cena candidata: filtra bloqueios, ordena por peso decrescente.
     Retorna cena_id ou None.
     """
-    agora = _tempo_simulado_atual() or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    agora = ref_ts or _tempo_simulado_atual() or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     row = fetchone("""
         SELECT c.id
         FROM cenas c
@@ -149,6 +149,9 @@ def registrar_pendente(intervencao_id: int, morador_id: int, cena_id: int,
         "criado_em_real": time.monotonic(),
     }
 
+
+# Maior registrado_em já processado por detectar_desvios (guarda de idempotência).
+_ultimo_ts_detectado: str | None = None
 
 # Ciclo atual do motor (atualizado em loop_motor)
 _ciclo_atual: int = 0
@@ -227,8 +230,8 @@ def _decidir_reacao(info: dict, desvio: dict | None) -> str:
 
     media_atual, n = stats
     dp = baseline["desvio_padrao"] or 0.1
-    se = dp / math.sqrt(max(n, 1))
-    intensidade_atual = abs(media_atual - baseline["valor_medio"]) / se
+    # z-score do valor (consistente com detectar_desvios).
+    intensidade_atual = abs(media_atual - baseline["valor_medio"]) / dp
 
     if intensidade_atual < desvio["intensidade"] * 0.7:
         return "aceite_implicito"
@@ -241,10 +244,78 @@ def _decidir_reacao(info: dict, desvio: dict | None) -> str:
     return "ignorada"
 
 
+def replay(passo_min: int = 5, janela_dias_baseline: int | None = None,
+           seed: int | None = None) -> dict:
+    """Reprocessa a linha do tempo cronologicamente: gera intervenções e reações
+    distribuídas ao longo do tempo simulado, em vez de só na janela final.
+
+    Calcula os baselines, depois avança um cursor do fim da janela de baseline até
+    MAX(registrado_em), de passo_min em passo_min minutos. Em cada cursor detecta os
+    desvios da janela que termina ali, dispara intervenções e avalia a reação
+    observando a janela ~10 min à frente (os dados já existem). Uma reação por
+    intervenção. Retorna {desvios, intervencoes, reacoes}.
+
+    seed: semente do RNG das reações; se None, usa config.SEED; se ambos None, não semeia (não determinístico).
+    """
+    semente = seed if seed is not None else SEED
+    if semente is not None:
+        random.seed(semente)
+
+    with usar_conexao_unica():
+        janela = janela_dias_baseline if janela_dias_baseline is not None else BASELINE_JANELA_DIAS
+
+        for m in fetchall("SELECT id FROM moradores"):
+            salvar_baseline(m["id"])
+
+        lim = fetchone("SELECT MIN(registrado_em) AS mn, MAX(registrado_em) AS mx FROM leituras")
+        if not lim or not lim["mn"]:
+            return {"desvios": 0, "intervencoes": 0, "reacoes": 0}
+
+        cursor = datetime.fromisoformat(lim["mn"]) + timedelta(days=janela)
+        fim = datetime.fromisoformat(lim["mx"])
+
+        n_desvios = n_interv = n_reacoes = 0
+        while cursor <= fim:
+            ts = cursor.strftime("%Y-%m-%d %H:%M:%S")
+            desvios = detectar_desvios(ref_ts=ts)
+            n_desvios += len(desvios)
+            for desvio_id in desvios:
+                d = fetchone("SELECT morador_id, comodo_id FROM desvios_detectados WHERE id=?", (desvio_id,))
+                if not d:
+                    continue
+                cena_id = resolver_cena(d["morador_id"], d["comodo_id"], ref_ts=ts)
+                if not cena_id:
+                    continue
+                interv_id = executar_intervencao(cena_id, d["morador_id"], d["comodo_id"], desvio_id, ts)
+                n_interv += 1
+                avaliar_apos = (cursor + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
+                if random.random() < PROB_CANCELAMENTO:
+                    cancelar_intervencao_simulada(interv_id, ts)
+                    ajustar_peso(d["morador_id"], cena_id, -0.2)
+                    verificar_e_criar_bloqueio(d["morador_id"], cena_id, ts)
+                else:
+                    desvio_row = fetchone(
+                        "SELECT baseline_id, intensidade FROM desvios_detectados WHERE id=?", (desvio_id,))
+                    info = {"comodo_id": d["comodo_id"], "avaliar_apos": avaliar_apos}
+                    tipo = _decidir_reacao(info, desvio_row)
+                    registrar_reacao(interv_id, tipo, avaliar_apos)
+                    if tipo == "aceite_implicito":
+                        ajustar_peso(d["morador_id"], cena_id, +0.1)
+                n_reacoes += 1
+            cursor += timedelta(minutes=passo_min)
+
+        log.info("Replay: desvios=%d intervencoes=%d reacoes=%d", n_desvios, n_interv, n_reacoes)
+        return {"desvios": n_desvios, "intervencoes": n_interv, "reacoes": n_reacoes}
+
+
 async def loop_motor() -> None:
     """Task assíncrona: roda a cada MOTOR_INTERVAL_SECONDS."""
     # Aguarda DB estar pronto
     await asyncio.sleep(2)
+
+    if SEED is not None:
+        random.seed(SEED)
+        log.info("Motor: RNG semeado com SEED=%d", SEED)
 
     # Calcula baselines iniciais
     moradores = fetchall("SELECT id FROM moradores")
@@ -253,6 +324,10 @@ async def loop_motor() -> None:
             salvar_baseline(m["id"])
         except Exception as e:
             log.warning("Baseline inicial falhou morador=%d: %s", m["id"], e)
+
+    global _ultimo_ts_detectado
+    _row_ult = fetchone("SELECT MAX(detectado_em) AS t FROM desvios_detectados")
+    _ultimo_ts_detectado = _row_ult["t"] if _row_ult and _row_ult["t"] else None
 
     global _ciclo_atual
     while True:
@@ -297,3 +372,11 @@ async def loop_motor() -> None:
             log.error("Erro no motor: %s", e)
 
         await asyncio.sleep(MOTOR_INTERVAL_SECONDS)
+
+
+if __name__ == "__main__":
+    import sys
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    passo = int(sys.argv[1]) if len(sys.argv) > 1 else 5
+    semente = int(sys.argv[2]) if len(sys.argv) > 2 else None
+    print(replay(passo_min=passo, seed=semente))

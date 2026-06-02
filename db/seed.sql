@@ -210,3 +210,20 @@ INSERT INTO agendamentos_sutis (morador_id, cena_id, dia_semana, horario, ativo)
     (1, 2, NULL, '07:00', 1),  -- Maria: despertar_gradual todo dia 7h
     (2, 2, NULL, '07:00', 1),  -- Pedro: despertar_gradual todo dia 7h
     (3, 7, NULL, '09:00', 1);  -- Lucas: manha_silenciosa todo dia 9h
+
+-- =============================================================
+-- Q03 — LEFT JOIN: cômodo sem sensores
+-- 'lavanderia' sem nenhum sensor → aparece em Q03 como gap de cobertura
+-- =============================================================
+INSERT INTO comodos (residencia_id, nome, tipo, area_m2)
+VALUES (1, 'lavanderia', 'area_servico', 6.0);
+
+-- =============================================================
+-- Q04 — RIGHT JOIN (via LEFT invertido): sensor ativo sem leituras
+-- Sensor de umidade extra no escritório com ativo=1
+-- O simulador NÃO gera leituras para este sensor (simulador/config.py → SENSOR_IGNORADOS)
+-- comodo_id=7 (escritorio), tipo_sensor_id=7 (umidade), protocolo_id=1 (zigbee)
+-- Este sensor recebe id=24 após os 23 acima
+-- =============================================================
+INSERT INTO sensores (comodo_id, tipo_sensor_id, protocolo_id, fabricante, ativo)
+VALUES (7, 7, 1, 'Aqara', 1);

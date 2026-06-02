@@ -3,6 +3,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR/.."
 VENV="$ROOT/.venv/bin"
+REPLAY_PASSO="${REPLAY_PASSO:-60}"
 
 cd "$ROOT"
 
@@ -25,6 +26,9 @@ done
 
 echo "[hemera] Iniciando simulador (cenário=luto, 30 dias, 1440x)..."
 "$VENV/python" -m simulador.simulador --cenario luto --dias 30 --velocidade 1440
+
+echo "[demo] Gerando histórico reativo (replay cronológico, passo=${REPLAY_PASSO}min)..."
+"$VENV/python" -m hemera.motor "${REPLAY_PASSO}"
 
 echo "[hemera] Simulação concluída."
 echo "[hemera] Painel disponível em http://localhost:8000"

@@ -3,12 +3,13 @@ import logging
 import math
 from datetime import datetime, timedelta
 
+from hemera.config import BASELINE_JANELA_DIAS
 from hemera.database import execute, fetchall, fetchone
 
 log = logging.getLogger(__name__)
 
 
-def calcular_baseline(morador_id: int, janela_dias: int = 14) -> list[dict]:
+def calcular_baseline(morador_id: int, janela_dias: int = BASELINE_JANELA_DIAS) -> list[dict]:
     """
     Agrega leituras dos últimos `janela_dias` dias por cômodo×tipo_sensor.
     Retorna lista de dicts {comodo_id, metrica, valor_medio, desvio_padrao}.
@@ -19,25 +20,31 @@ def calcular_baseline(morador_id: int, janela_dias: int = 14) -> list[dict]:
     desde = ini
     ate = (datetime.fromisoformat(ini) + timedelta(days=janela_dias)).strftime("%Y-%m-%d %H:%M:%S")
 
-    # Presença: morador associado ao cômodo via moradores.residencia_id → comodos
+    # Presença: pondera cada leitura pela probabilidade de presença do morador
+    # no cômodo×hora (padroes_comportamentais). Cômodos sem padrão saem fora.
     rows = fetchall("""
         SELECT
             s.comodo_id,
-            ts.codigo            AS metrica,
-            AVG(l.valor)         AS media,
-            -- variância manual via AVG(x²) - AVG(x)²
-            AVG(l.valor * l.valor) - AVG(l.valor) * AVG(l.valor) AS variancia,
-            COUNT(*)             AS n
+            ts.codigo AS metrica,
+            CAST(strftime('%H', l.registrado_em) AS INTEGER) AS hora,
+            SUM(pc.valor * l.valor) / SUM(pc.valor) AS media,
+            SUM(pc.valor * l.valor * l.valor) / SUM(pc.valor)
+                - (SUM(pc.valor * l.valor) / SUM(pc.valor))
+                * (SUM(pc.valor * l.valor) / SUM(pc.valor)) AS variancia,
+            COUNT(*) AS n
         FROM leituras l
-        JOIN sensores s   ON l.sensor_id = s.id
-        JOIN tipos_sensor ts ON s.tipo_sensor_id = ts.id
-        JOIN comodos c    ON s.comodo_id = c.id
-        JOIN moradores m  ON c.residencia_id = m.residencia_id
-        WHERE m.id = ?
-          AND l.registrado_em >= ?
+        JOIN sensores s       ON l.sensor_id = s.id
+        JOIN tipos_sensor ts  ON s.tipo_sensor_id = ts.id
+        JOIN padroes_comportamentais pc
+            ON pc.comodo_id     = s.comodo_id
+           AND pc.morador_id    = ?
+           AND pc.metrica       = 'presenca'
+           AND pc.janela_inicio = strftime('%H', l.registrado_em) || ':00'
+        WHERE l.registrado_em >= ?
           AND l.registrado_em < ?
           AND s.ativo = 1
-        GROUP BY s.comodo_id, ts.codigo
+        GROUP BY s.comodo_id, ts.codigo, hora
+        HAVING SUM(pc.valor) > 0
     """, (morador_id, desde, ate))
 
     resultado = []
@@ -46,13 +53,14 @@ def calcular_baseline(morador_id: int, janela_dias: int = 14) -> list[dict]:
         resultado.append({
             "comodo_id":     r["comodo_id"],
             "metrica":       r["metrica"],
+            "hora":          r["hora"],
             "valor_medio":   r["media"],
             "desvio_padrao": math.sqrt(variancia),
         })
     return resultado
 
 
-def salvar_baseline(morador_id: int, janela_dias: int = 14) -> int:
+def salvar_baseline(morador_id: int, janela_dias: int = BASELINE_JANELA_DIAS) -> int:
     """
     Calcula e persiste baseline. Retorna número de linhas inseridas.
     """
@@ -61,9 +69,13 @@ def salvar_baseline(morador_id: int, janela_dias: int = 14) -> int:
 
     for b in baselines:
         execute("""
-            INSERT INTO baselines (morador_id, comodo_id, metrica, valor_medio, desvio_padrao, calculado_em)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (morador_id, b["comodo_id"], b["metrica"],
+            INSERT INTO baselines (morador_id, comodo_id, metrica, hora, valor_medio, desvio_padrao, calculado_em)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(morador_id, comodo_id, metrica, hora) DO UPDATE SET
+                valor_medio   = excluded.valor_medio,
+                desvio_padrao = excluded.desvio_padrao,
+                calculado_em  = excluded.calculado_em
+        """, (morador_id, b["comodo_id"], b["metrica"], b["hora"],
               b["valor_medio"], b["desvio_padrao"], agora))
 
     log.debug("Baseline salvo: morador=%d linhas=%d", morador_id, len(baselines))

@@ -1,15 +1,23 @@
 """SQLite connection helpers for Hemera."""
 import sqlite3
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Generator
 
 from hemera.config import DB_PATH
 
+# Conexão reusável por thread (opt-in via usar_conexao_unica).
+_conn_local = threading.local()
+
 
 @contextmanager
 def get_connection() -> Generator[sqlite3.Connection, None, None]:
     """Context manager: yields connection with FK enforcement, WAL mode."""
+    existente = getattr(_conn_local, "conn", None)
+    if existente is not None:
+        yield existente          # reuse; owner (usar_conexao_unica) commits/closes
+        return
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -21,6 +29,26 @@ def get_connection() -> Generator[sqlite3.Connection, None, None]:
         conn.rollback()
         raise
     finally:
+        conn.close()
+
+
+@contextmanager
+def usar_conexao_unica() -> Generator[sqlite3.Connection, None, None]:
+    """Reusa UMA conexão no escopo (acelera laços com muitas queries, ex.: replay).
+    Não usar concorrentemente com o loop assíncrono do app."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    _conn_local.conn = conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        _conn_local.conn = None
         conn.close()
 
 

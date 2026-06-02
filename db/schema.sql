@@ -109,10 +109,14 @@ CREATE TABLE IF NOT EXISTS baselines (
     morador_id      INTEGER NOT NULL REFERENCES moradores(id) ON DELETE CASCADE,
     comodo_id       INTEGER NOT NULL REFERENCES comodos(id) ON DELETE CASCADE,
     metrica         TEXT    NOT NULL,
+    hora            INTEGER NOT NULL DEFAULT 0,
     valor_medio     REAL    NOT NULL,
     desvio_padrao   REAL    NOT NULL DEFAULT 0,
     calculado_em    TEXT    NOT NULL DEFAULT (DATETIME('now'))
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_baselines_unico
+    ON baselines(morador_id, comodo_id, metrica, hora);
 
 -- =============================================================
 -- DETECÇÃO DE DESVIOS

@@ -22,6 +22,13 @@ const ICONES_DISP = {
   geladeira: 'kitchen',
 };
 
+function formatarComodo(nome) {
+  return (nome || '?')
+    .replace(/^quarto_/, 'quarto de ')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
 export default function AddItemPopup({ pos, tipos, comodos, onAdd, onCancel }) {
   const [categoria, setCategoria] = useState('sensor');
   const [tipoId, setTipoId] = useState('');
@@ -93,6 +100,9 @@ export default function AddItemPopup({ pos, tipos, comodos, onAdd, onCancel }) {
       </div>
 
       <div className="space-y-2 mb-3">
+        <label className="block text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
+          Tipo
+        </label>
         <select
           value={tipoId}
           onChange={(e) => setTipoId(e.target.value)}
@@ -105,6 +115,9 @@ export default function AddItemPopup({ pos, tipos, comodos, onAdd, onCancel }) {
           ))}
         </select>
 
+        <label className="block text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
+          Cômodo
+        </label>
         <select
           value={comodoId}
           onChange={(e) => setComodoId(e.target.value)}
@@ -112,7 +125,7 @@ export default function AddItemPopup({ pos, tipos, comodos, onAdd, onCancel }) {
         >
           {comodos.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.nome.replace(/_/g, ' ')}
+              {formatarComodo(c.nome)}
             </option>
           ))}
         </select>

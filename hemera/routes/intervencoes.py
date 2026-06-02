@@ -33,6 +33,18 @@ def listar_desvios(limit: int = 50) -> list[dict]:
     """, (limit,))
 
 
+@router.get("/api/contadores")
+def contadores() -> dict:
+    """Totais usados pelo cabeçalho do painel."""
+    row = fetchone("""
+        SELECT
+            (SELECT COUNT(*) FROM leituras) AS leituras,
+            (SELECT COUNT(*) FROM desvios_detectados) AS desvios,
+            (SELECT COUNT(*) FROM intervencoes) AS intervencoes
+    """)
+    return row or {"leituras": 0, "desvios": 0, "intervencoes": 0}
+
+
 @router.post("/api/intervencoes/{intervencao_id}/cancelar")
 def cancelar(intervencao_id: int) -> dict:
     row = fetchone("SELECT id FROM intervencoes WHERE id=?", (intervencao_id,))

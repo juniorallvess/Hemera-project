@@ -5,8 +5,8 @@ export default defineConfig({
   plugins: [react()],
   base: '/',
   build: {
-    outDir: '../hemera/static',
-    emptyOutDir: false,
+    outDir: 'dist',
+    emptyOutDir: true,
   },
   server: {
     port: 5173,

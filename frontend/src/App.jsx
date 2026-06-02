@@ -1,9 +1,13 @@
 import { useCallback, useState } from 'react';
+import AnalisesPanel from './components/AnalisesPanel';
+import MapaEditor from './components/MapaEditor';
 import AppHeader from './components/AppHeader';
 import BlueprintCard from './components/BlueprintCard';
 import BottomNav from './components/BottomNav';
 import EventLog from './components/EventLog';
-import QueryPanel from './components/QueryPanel';
+import MoradorList from './components/MoradorList';
+import AvancadoPanel from './components/AvancadoPanel';
+import SensorList from './components/SensorList';
 import SettingsDrawer from './components/SettingsDrawer';
 import SideNav from './components/SideNav';
 import { useCounters } from './hooks/useCounters';
@@ -36,6 +40,8 @@ export default function App() {
     salvarPosicaoDispositivo,
     criarSensor,
     criarDispositivo,
+    deletarSensor,
+    deletarDispositivo,
     uploadPlanta,
   } = useSensorLayout();
   const { status: simStatus, loading: simLoading, iniciar, parar } = useSimulator();
@@ -48,12 +54,13 @@ export default function App() {
   } = useCounters();
   const { activeQuery, loading, error, result, executarQuery } = useQueries();
 
+  const activeView = activeNav;
+
   const handleNavigate = useCallback(
     (navId, sectionId, queryNum) => {
       setActiveNav(navId);
       scrollToSection(sectionId);
       if (queryNum) executarQuery(queryNum);
-      if (navId === 'sensors') setSettingsOpen(true);
     },
     [executarQuery],
   );
@@ -82,6 +89,16 @@ export default function App() {
     [salvarPosicaoDispositivo],
   );
 
+  const handleDeleteSensor = useCallback(
+    (id) => deletarSensor(id),
+    [deletarSensor],
+  );
+
+  const handleDeleteDispositivo = useCallback(
+    (id) => deletarDispositivo(id),
+    [deletarDispositivo],
+  );
+
   const handleAddItem = useCallback(
     async ({ categoria, tipoId, comodoId, pos_x, pos_y }) => {
       let novo;
@@ -101,8 +118,6 @@ export default function App() {
       if (ok) {
         setPlantaReload((n) => n + 1);
         setSettingsOpen(false);
-        setActiveNav('overview');
-        scrollToSection('section-planta');
       }
     },
     [uploadPlanta],
@@ -120,31 +135,63 @@ export default function App() {
         />
         <div className="flex-1 p-6 lg:p-10 flex flex-col xl:flex-row gap-8">
           <div className="flex-1 flex flex-col gap-8 min-w-0">
-            <BlueprintCard
-              onPlantaReady={onPlantaReady}
-              aplicarLayout={aplicarLayout}
-              layout={layout}
-              dispositivosLayout={dispositivosLayout}
-              editMode={editMode}
-              onSensorMove={handleSensorMove}
-              onDispositivoMove={handleDispositivoMove}
-              onAddItem={handleAddItem}
-              tipos={tipos}
-              comodos={comodos}
-              reloadKey={plantaReload}
-            />
-            <QueryPanel
-              activeQuery={activeQuery}
-              loading={loading}
-              error={error}
-              result={result}
-              onSelectQuery={(n) => {
-                setActiveNav('analytics');
-                executarQuery(n);
-              }}
-            />
+            {activeView === 'overview' && (
+              <>
+                <BlueprintCard
+                  onPlantaReady={onPlantaReady}
+                  aplicarLayout={aplicarLayout}
+                  layout={layout}
+                  dispositivosLayout={dispositivosLayout}
+                  editMode={editMode}
+                  onSensorMove={handleSensorMove}
+                  onDispositivoMove={handleDispositivoMove}
+                  onAddItem={handleAddItem}
+                  tipos={tipos}
+                  comodos={comodos}
+                  reloadKey={plantaReload}
+                />
+                <MoradorList />
+              </>
+            )}
+
+            {activeView === 'analytics' && (
+              <AnalisesPanel />
+            )}
+
+            {activeView === 'sensors' && (
+              <SensorList
+                sensores={layout}
+                dispositivos={dispositivosLayout}
+                comodos={comodos}
+                onSaveSensor={handleSensorMove}
+                onSaveDispositivo={handleDispositivoMove}
+                onDeleteSensor={handleDeleteSensor}
+                onDeleteDispositivo={handleDeleteDispositivo}
+                onOpenSettings={() => setSettingsOpen(true)}
+              />
+            )}
+
+            {activeView === 'avancado' && (
+              <AvancadoPanel
+                activeQuery={activeQuery}
+                loading={loading}
+                error={error}
+                result={result}
+                onSelectQuery={executarQuery}
+              />
+            )}
+
+            {activeView === 'history' && (
+              <EventLog items={timelineItems} full />
+            )}
+
+            {activeView === 'editor' && (
+              <MapaEditor reloadKey={plantaReload} />
+            )}
           </div>
-          <EventLog items={timelineItems} />
+          {(activeView === 'overview' || activeView === 'analytics' || activeView === 'avancado') && (
+            <EventLog items={timelineItems} />
+          )}
         </div>
       </main>
       <BottomNav activeNav={activeNav} onNavigate={handleNavigate} />

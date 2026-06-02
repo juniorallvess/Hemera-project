@@ -1,8 +1,9 @@
 const ITEMS = [
-  { id: 'q1-3', icon: 'query_stats', label: 'Q01–Q03', section: 'section-queries', query: 1 },
   { id: 'overview', icon: 'dashboard', label: 'Visão geral', section: 'section-planta', filled: true },
-  { id: 'q10-12', icon: 'data_exploration', label: 'Q10–Q12', section: 'section-queries', query: 10 },
+  { id: 'sensors', icon: 'sensors', label: 'Sensores', section: 'section-planta' },
+  { id: 'avancado', icon: 'storage', label: 'Avançado', section: 'section-queries' },
   { id: 'history', icon: 'history', label: 'Histórico', section: 'section-events' },
+  { id: 'editor', icon: 'edit_square', label: 'Editor', section: '' },
 ];
 
 export default function BottomNav({ activeNav, onNavigate }) {

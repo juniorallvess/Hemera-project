@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { pontoInteriorAleatorio, pontoCruzamento } from '../utils/geometria';
 
 const PREFIXOS = {
   quarto_maria: 'qm',
@@ -29,29 +30,113 @@ function svgIdSensor(comodo, tipo) {
   return `s_${pref}_${suf}`;
 }
 
+function animarPorWaypoints(g, waypoints, durMs, onEnd) {
+  if (!waypoints || waypoints.length === 0) { onEnd?.(); return; }
+  if (waypoints.length === 1) {
+    g.setAttribute('transform', `translate(${waypoints[0][0]}, ${waypoints[0][1]})`);
+    onEnd?.();
+    return;
+  }
+  const segCount = waypoints.length - 1;
+  const segDur = durMs / segCount;
+  let startTime = null;
+  function step(ts) {
+    if (!startTime) startTime = ts;
+    const elapsed = ts - startTime;
+    if (elapsed >= durMs) {
+      const last = waypoints[waypoints.length - 1];
+      g.setAttribute('transform', `translate(${last[0]}, ${last[1]})`);
+      onEnd?.();
+      return;
+    }
+    const segIdx = Math.min(Math.floor(elapsed / segDur), segCount - 1);
+    const t = Math.min((elapsed - segIdx * segDur) / segDur, 1);
+    const [x1, y1] = waypoints[segIdx];
+    const [x2, y2] = waypoints[segIdx + 1];
+    g.setAttribute('transform', `translate(${x1 + (x2 - x1) * t}, ${y1 + (y2 - y1) * t})`);
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
 export function usePlanta() {
   const svgRootRef = useRef(null);
   const moradoresRef = useRef(new Map());
+  const overdaysRef = useRef(new Map()); // comodo_nome → lighting element
+  const centrosPorComodoRef = useRef(new Map()); // comodo_nome → {cx, cy}
+  const sensoresPorComodoRef = useRef(new Map()); // comodo_nome → [{x, y}, ...]
+  const poligonosPorComodoRef = useRef({}); // comodo_nome → [[x,y],...] | null
+  const estadoMoradorRef = useRef(new Map()); // morador_id → { comodo, ponto: [x,y] }
 
   const onPlantaReady = useCallback((svgEl) => {
     svgRootRef.current = svgEl;
-    let layer = svgEl.querySelector('#camada-moradores');
-    if (!layer) {
-      layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      layer.setAttribute('id', 'camada-moradores');
-      svgEl.appendChild(layer);
-    }
     moradoresRef.current.clear();
+    overdaysRef.current.clear();
+    estadoMoradorRef.current.clear();
+
+    // Layer 1 (lowest): lighting tints — created here, sits above original SVG content
+    let iluminacaoLayer = svgEl.querySelector('#camada-iluminacao');
+    if (!iluminacaoLayer) {
+      iluminacaoLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      iluminacaoLayer.setAttribute('id', 'camada-iluminacao');
+      svgEl.appendChild(iluminacaoLayer);
+    }
+
+    // Layer 3 (topmost): resident dots — always re-appended so it's the last SVG child
+    let moradorLayer = svgEl.querySelector('#camada-moradores');
+    if (!moradorLayer) {
+      moradorLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      moradorLayer.setAttribute('id', 'camada-moradores');
+    }
+    svgEl.appendChild(moradorLayer);
+
+    // Fetch room polygons; refresh on each overview mount
+    fetch('/api/comodos/geometria')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data?.comodos) return;
+        const mapa = {};
+        data.comodos.forEach((c) => {
+          mapa[c.comodo] = c.poligono?.length >= 3 ? c.poligono : null;
+        });
+        poligonosPorComodoRef.current = mapa;
+      })
+      .catch(() => {});
   }, []);
 
   const aplicarLayout = useCallback((layout) => {
     const svg = svgRootRef.current;
     if (!svg || !layout?.length) return;
 
+    // Build sensor centroid map from DB positions (the proven coordinate source)
+    const sensoresPorComodo = new Map();
+    layout.forEach((s) => {
+      if (s.kind !== 'sensor' || s.pos_x == null || s.pos_y == null || !s.comodo) return;
+      if (!sensoresPorComodo.has(s.comodo)) sensoresPorComodo.set(s.comodo, []);
+      sensoresPorComodo.get(s.comodo).push({ x: s.pos_x, y: s.pos_y });
+    });
+
+    const centrosPorComodo = new Map();
+    sensoresPorComodo.forEach((pts, comodo) => {
+      const cx = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+      const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+      centrosPorComodo.set(comodo, { cx, cy });
+    });
+
+    centrosPorComodoRef.current = centrosPorComodo;
+    sensoresPorComodoRef.current = sensoresPorComodo;
+
+    // Layer 2: sensor overlay — must sit between iluminacao and moradores
     let overlay = svg.querySelector('#camada-sensores-overlay');
     if (!overlay) {
       overlay = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       overlay.setAttribute('id', 'camada-sensores-overlay');
+    }
+    const moradorLayer = svg.querySelector('#camada-moradores');
+    if (moradorLayer) {
+      svg.insertBefore(overlay, moradorLayer);
+      svg.appendChild(moradorLayer); // keep moradores layer last (top paint)
+    } else {
       svg.appendChild(overlay);
     }
 
@@ -127,27 +212,60 @@ export function usePlanta() {
     overlay.appendChild(el);
   }, []);
 
-  const moverMorador = useCallback((moradorId, x, y, comodo) => {
+  const moverMorador = useCallback((moradorId, comodo, comodoId) => {
     const svg = svgRootRef.current;
     if (!svg) return;
     const layer = svg.querySelector('#camada-moradores');
     if (!layer) return;
+
+    const nome = comodo || (comodoId != null ? COMODO_ID_NOME[comodoId] : null);
+    if (!nome) return;
+
+    const poligonos = poligonosPorComodoRef.current;
+    const poligonoDestino = poligonos[nome];
+
+    let tx, ty;
+    if (poligonoDestino?.length) {
+      const p = pontoInteriorAleatorio(poligonoDestino);
+      tx = p[0];
+      ty = p[1];
+    } else {
+      const centro = centrosPorComodoRef.current.get(nome);
+      if (centro) {
+        const offsets = [-22, 0, 22];
+        tx = centro.cx + offsets[(moradorId - 1) % offsets.length];
+        ty = centro.cy + 45;
+      } else {
+        const grupo = nome ? svg.querySelector(`#comodo_${nome}`) : null;
+        if (!grupo) return;
+        const box = grupo.getBBox?.();
+        if (!box || !box.width || !box.height) return;
+        const pad = Math.min(16, box.width / 4, box.height / 4);
+        const faixa = [0.5, 0.32, 0.68][(moradorId - 1) % 3];
+        tx = box.x + Math.min(Math.max(box.width * faixa, pad), box.width - pad);
+        ty = box.y + Math.min(Math.max(box.height * 0.64, pad), box.height - pad);
+      }
+    }
+
+    if (!isFinite(tx) || !isFinite(ty)) return;
 
     let g = moradoresRef.current.get(moradorId);
     if (!g) {
       g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       g.setAttribute('class', 'morador-marker');
       const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('r', '10');
+      circle.setAttribute('r', '9');
       circle.setAttribute('fill', CORES_MORADOR[(moradorId - 1) % CORES_MORADOR.length]);
-      circle.setAttribute('stroke', '#faf5ee');
+      circle.setAttribute('stroke', '#fff');
       circle.setAttribute('stroke-width', '2');
       const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       label.setAttribute('class', 'morador-label');
       label.setAttribute('text-anchor', 'middle');
-      label.setAttribute('y', '4');
+      label.setAttribute('dominant-baseline', 'central');
+      label.setAttribute('y', '0');
       label.setAttribute('font-size', '9');
-      label.setAttribute('fill', '#faf5ee');
+      label.setAttribute('fill', '#fff');
+      label.setAttribute('pointer-events', 'none');
       label.textContent = String(moradorId);
       g.appendChild(circle);
       g.appendChild(label);
@@ -155,19 +273,33 @@ export function usePlanta() {
       moradoresRef.current.set(moradorId, g);
     }
 
-    const grupo = svg.querySelector(`#comodo_${comodo}`);
-    let tx = x;
-    let ty = y;
-    if (grupo) {
-      const box = grupo.getBBox?.();
-      if (box) {
-        tx = box.x + box.width / 2;
-        ty = box.y + box.height / 2;
+    const destino = [tx, ty];
+    const estadoAtual = estadoMoradorRef.current.get(moradorId);
+    estadoMoradorRef.current.set(moradorId, { comodo: nome, ponto: destino });
+
+    let waypoints;
+    try {
+      if (
+        estadoAtual?.ponto &&
+        poligonoDestino?.length &&
+        poligonos[estadoAtual.comodo]?.length &&
+        estadoAtual.comodo !== nome
+      ) {
+        const cruzamento = pontoCruzamento(poligonos[estadoAtual.comodo], poligonoDestino);
+        waypoints = [estadoAtual.ponto, cruzamento, destino];
+      } else if (estadoAtual?.ponto) {
+        waypoints = [estadoAtual.ponto, destino];
+      } else {
+        waypoints = [destino];
       }
+    } catch (_) {
+      waypoints = [destino];
     }
-    g.setAttribute('transform', `translate(${tx}, ${ty})`);
-    g.classList.add('ativo');
-    setTimeout(() => g.classList.remove('ativo'), 1200);
+
+    animarPorWaypoints(g, waypoints, 800, () => {
+      g.classList.add('ativo');
+      setTimeout(() => g.classList.remove('ativo'), 1200);
+    });
   }, []);
 
   const pulsarComodo = useCallback((comodoRef) => {
@@ -177,8 +309,8 @@ export function usePlanta() {
       typeof comodoRef === 'number' ? COMODO_ID_NOME[comodoRef] : comodoRef;
     const grupo = nome ? svg.querySelector(`#comodo_${nome}`) : null;
     const alvos = grupo
-      ? grupo.querySelectorAll('.device-icon, .sensor-dot')
-      : svg.querySelectorAll('.device-icon');
+      ? grupo.querySelectorAll('.device-icon, .device-dot, .sensor-dot')
+      : svg.querySelectorAll('.device-icon, .device-dot');
     alvos.forEach((d) => {
       d.classList.add('ativo');
       setTimeout(() => d.classList.remove('ativo'), 2000);
@@ -196,12 +328,79 @@ export function usePlanta() {
     }
   }, []);
 
+  const iluminarComodo = useCallback((comodoNome, ocupado) => {
+    const svg = svgRootRef.current;
+    if (!svg) return;
+
+    const poligono = poligonosPorComodoRef.current[comodoNome];
+    const iluminacaoLayer = svg.querySelector('#camada-iluminacao');
+    let overlay = overdaysRef.current.get(comodoNome);
+
+    if (poligono?.length) {
+      // Polygon-based tint: replace rect with polygon element if needed
+      if (overlay && overlay.tagName !== 'polygon') {
+        overlay.parentNode?.removeChild(overlay);
+        overlay = null;
+      }
+      if (!overlay) {
+        overlay = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        overlay.setAttribute('pointer-events', 'none');
+        overlay.setAttribute('class', 'comodo-luz-overlay');
+        (iluminacaoLayer || svg).appendChild(overlay);
+        overdaysRef.current.set(comodoNome, overlay);
+      }
+      overlay.setAttribute('points', poligono.map(([x, y]) => `${x},${y}`).join(' '));
+      overlay.setAttribute('fill', ocupado ? '#fbbf24' : '#1e3a5f');
+      overlay.setAttribute('opacity', ocupado ? '0.18' : '0.08');
+    } else {
+      // Sensor-bbox fallback (original behavior)
+      if (overlay && overlay.tagName !== 'rect') {
+        overlay.parentNode?.removeChild(overlay);
+        overlay = null;
+      }
+      const pts = sensoresPorComodoRef.current.get(comodoNome);
+      let rx, ry, rw, rh;
+      if (pts && pts.length > 0) {
+        const PAD = 55;
+        const xs = pts.map((p) => p.x);
+        const ys = pts.map((p) => p.y);
+        rx = Math.min(...xs) - PAD;
+        ry = Math.min(...ys) - PAD;
+        rw = Math.max(...xs) - Math.min(...xs) + PAD * 2;
+        rh = Math.max(...ys) - Math.min(...ys) + PAD * 2;
+      } else {
+        const grupo = svg.querySelector(`#comodo_${comodoNome}`);
+        if (!grupo) return;
+        const box = grupo.getBBox?.();
+        if (!box || !box.width || !box.height) return;
+        rx = box.x; ry = box.y; rw = box.width; rh = box.height;
+      }
+      if (!overlay) {
+        overlay = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        overlay.setAttribute('pointer-events', 'none');
+        overlay.setAttribute('class', 'comodo-luz-overlay');
+        (iluminacaoLayer || svg).appendChild(overlay);
+        overdaysRef.current.set(comodoNome, overlay);
+      }
+      overlay.setAttribute('x', rx);
+      overlay.setAttribute('y', ry);
+      overlay.setAttribute('width', rw);
+      overlay.setAttribute('height', rh);
+      overlay.setAttribute('fill', ocupado ? '#fbbf24' : '#1e3a5f');
+      overlay.setAttribute('opacity', ocupado ? '0.18' : '0.08');
+    }
+  }, []);
+
   const atualizarPlanta = useCallback(
     (msg) => {
       if (!svgRootRef.current) return;
 
       if (msg.tipo === 'morador_movimento' && msg.morador_id) {
-        moverMorador(msg.morador_id, msg.x, msg.y, msg.comodo);
+        moverMorador(msg.morador_id, msg.comodo, msg.comodo_id);
+      }
+
+      if (msg.tipo === 'comodo_estado' && msg.comodo) {
+        iluminarComodo(msg.comodo, msg.ocupado);
       }
 
       if (msg.tipo === 'intervencao' && msg.comodo_id) {
@@ -212,7 +411,7 @@ export function usePlanta() {
         pulsarSensor(msg.comodo, msg.sensor_tipo);
       }
     },
-    [pulsarComodo, pulsarSensor, moverMorador],
+    [pulsarComodo, pulsarSensor, moverMorador, iluminarComodo],
   );
 
   return { onPlantaReady, aplicarLayout, adicionarItem, atualizarPlanta };

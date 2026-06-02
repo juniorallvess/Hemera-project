@@ -71,11 +71,11 @@ export default function SettingsDrawer({
                   : 'bg-surface-container text-on-surface-variant hover:bg-secondary-container/50'
               }`}
             >
-              {editMode ? 'Sair do modo edição' : 'Editar posição dos sensores'}
+              {editMode ? 'Sair do modo edição' : 'Editar sensores e dispositivos'}
             </button>
             {editMode && (
               <p className="mt-2 text-xs text-on-surface-variant">
-                Arraste os pontos na planta. As posições são guardadas automaticamente.
+                Arraste sensores e dispositivos na planta. As posições são guardadas automaticamente.
               </p>
             )}
           </section>
@@ -87,7 +87,7 @@ export default function SettingsDrawer({
             <p className="text-sm text-on-surface-variant mb-4">
               {simStatus.rodando
                 ? `A correr (${simStatus.modo === 'ao_vivo' ? 'ao vivo' : 'batch'}) — dia ${simStatus.dia_simulado || 1}`
-                : 'Parada. Inicie para ver moradores e sensores na planta.'}
+                : 'Parada. Inicie para ver moradores, sensores e dispositivos na planta.'}
             </p>
             <div className="grid grid-cols-2 gap-2 mb-3">
               <button

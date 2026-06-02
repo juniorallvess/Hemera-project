@@ -89,6 +89,18 @@ export function useSensorLayout() {
     return novo;
   }, []);
 
+  const deletarSensor = useCallback(async (sensorId) => {
+    const res = await fetch(`/api/sensores/${sensorId}`, { method: 'DELETE' });
+    if (res.ok) setLayout((prev) => prev.filter((s) => s.id !== sensorId));
+    return res.ok;
+  }, []);
+
+  const deletarDispositivo = useCallback(async (dispId) => {
+    const res = await fetch(`/api/dispositivos/${dispId}`, { method: 'DELETE' });
+    if (res.ok) setDispositivosLayout((prev) => prev.filter((d) => d.id !== dispId));
+    return res.ok;
+  }, []);
+
   const uploadPlanta = useCallback(
     async (file) => {
       const fd = new FormData();
@@ -112,6 +124,8 @@ export function useSensorLayout() {
     salvarPosicaoDispositivo,
     criarSensor,
     criarDispositivo,
+    deletarSensor,
+    deletarDispositivo,
     uploadPlanta,
   };
 }

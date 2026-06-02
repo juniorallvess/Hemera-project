@@ -12,11 +12,11 @@ _QUERIES_SQL = Path(__file__).parent.parent.parent / "db" / "queries.sql"
 def _extrair_queries(sql: str) -> dict[int, str]:
     """
     Extrai as queries numeradas do arquivo queries.sql.
-    Identificadas pelo padrão '-- Q<N>'.
-    Para Q04 e Q11 que têm sub-blocos, usa a última instrução SELECT.
+    Identificadas pelo prefixo '-- Q<N>'. Blocos auxiliares como Q11b
+    não viram endpoint público.
     """
     blocos: dict[int, str] = {}
-    partes = re.split(r'-- Q(\d+)', sql)
+    partes = re.split(r'(?m)^--\s+Q(\d{1,2})(?![A-Za-z0-9])', sql)
     # partes[0] = texto antes do primeiro bloco
     # partes[1,3,5,...] = número, partes[2,4,6,...] = corpo
     i = 1
@@ -25,7 +25,7 @@ def _extrair_queries(sql: str) -> dict[int, str]:
         corpo = partes[i + 1]
         # Divide em statements por ';', filtra os que contêm SELECT
         stmts = re.split(r';', corpo)
-        sql_stmt = ""
+        candidates: list[str] = []
         for s in stmts:
             # Extrai apenas a parte SELECT de cada stmt (descarta linhas de comentário)
             linhas = s.split('\n')
@@ -41,7 +41,8 @@ def _extrair_queries(sql: str) -> dict[int, str]:
                     sql_lines.append(linha)
             candidate = '\n'.join(sql_lines).strip()
             if candidate:
-                sql_stmt = candidate  # sobrescreve — usa último SELECT do bloco (Q04 real)
+                candidates.append(candidate)
+        sql_stmt = candidates[-1] if num == 4 and candidates else (candidates[0] if candidates else "")
         if sql_stmt:
             blocos[num] = sql_stmt
         i += 2

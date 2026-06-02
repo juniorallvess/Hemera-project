@@ -159,6 +159,27 @@ def criar_dispositivo(body: NovoDispositivo) -> dict:
     return row
 
 
+@router.delete("/api/sensores/{sensor_id}")
+def deletar_sensor(sensor_id: int) -> dict:
+    if not fetchone("SELECT id FROM sensores WHERE id=?", (sensor_id,)):
+        raise HTTPException(404, "Sensor não encontrado")
+    # leituras.sensor_id ON DELETE CASCADE — apagadas automaticamente
+    with __import__("hemera.database", fromlist=["get_connection"]).get_connection() as conn:
+        conn.execute("DELETE FROM sensores WHERE id=?", (sensor_id,))
+    return {"ok": True, "id": sensor_id}
+
+
+@router.delete("/api/dispositivos/{disp_id}")
+def deletar_dispositivo(disp_id: int) -> dict:
+    if not fetchone("SELECT id FROM dispositivos WHERE id=?", (disp_id,)):
+        raise HTTPException(404, "Dispositivo não encontrado")
+    # acionamentos.dispositivo_id ON DELETE RESTRICT — apagar antes
+    with __import__("hemera.database", fromlist=["get_connection"]).get_connection() as conn:
+        conn.execute("DELETE FROM acionamentos WHERE dispositivo_id=?", (disp_id,))
+        conn.execute("DELETE FROM dispositivos WHERE id=?", (disp_id,))
+    return {"ok": True, "id": disp_id}
+
+
 @router.post("/api/planta/upload")
 async def upload_planta(arquivo: UploadFile = File(...)) -> dict:
     if not arquivo.filename or not arquivo.filename.lower().endswith(".svg"):

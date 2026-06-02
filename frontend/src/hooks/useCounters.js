@@ -15,11 +15,12 @@ export function useCounters() {
 
   const refreshContagens = useCallback(async () => {
     try {
-      await Promise.all([
-        fetch('/api/leituras/recentes?n=1').then((r) => r.json()),
-        fetch('/api/desvios?limit=1').then((r) => r.json()),
-        fetch('/api/intervencoes?limit=1').then((r) => r.json()),
-      ]);
+      const res = await fetch('/api/contadores');
+      if (!res.ok) return;
+      const data = await res.json();
+      setLeituras(data.leituras ?? 0);
+      setDesvios(data.desvios ?? 0);
+      setIntervencoes(data.intervencoes ?? 0);
       setUltimaAtualizacao(new Date().toTimeString().slice(0, 8));
     } catch (_) {}
   }, []);

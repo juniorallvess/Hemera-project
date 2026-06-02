@@ -3,6 +3,8 @@ const NAV_ITEMS = [
   { id: 'analytics', icon: 'analytics', label: 'Análises', section: 'section-queries' },
   { id: 'sensors', icon: 'sensors', label: 'Sensores', section: 'section-planta' },
   { id: 'history', icon: 'history', label: 'Histórico', section: 'section-events' },
+  { id: 'avancado', icon: 'storage', label: 'Avançado (BD)', section: 'section-queries' },
+  { id: 'editor', icon: 'edit_square', label: 'Editor de Mapa', section: '' },
 ];
 
 export default function SideNav({ activeNav, onNavigate }) {

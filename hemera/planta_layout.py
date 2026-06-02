@@ -38,6 +38,27 @@ POSICOES_PADRAO: dict[int, tuple[float, float]] = {
     23: (635, 252),
 }
 
+POSICOES_DISPOSITIVOS_PADRAO: dict[int, tuple[float, float]] = {
+    1: (58, 132),
+    2: (88, 132),
+    3: (118, 132),
+    4: (250, 132),
+    5: (280, 132),
+    6: (310, 132),
+    7: (440, 132),
+    8: (470, 132),
+    9: (80, 292),
+    10: (115, 292),
+    11: (150, 292),
+    12: (340, 292),
+    13: (375, 292),
+    14: (565, 292),
+    15: (600, 292),
+    16: (630, 132),
+    17: (660, 132),
+    18: (690, 132),
+}
+
 CENTROS_COMODO: dict[str, tuple[float, float]] = {
     "quarto_maria": (115, 108),
     "quarto_pedro_maria": (305, 108),
@@ -95,6 +116,29 @@ def aplicar_migracao_layout() -> None:
             (x, y, sid),
         )
 
+    for did, (x, y) in POSICOES_DISPOSITIVOS_PADRAO.items():
+        execute(
+            "UPDATE dispositivos SET pos_x=?, pos_y=? WHERE id=? AND (pos_x IS NULL OR pos_y IS NULL)",
+            (x, y, did),
+        )
+
+
+def aplicar_migracao_geometria() -> None:
+    """Idempotente: cria a tabela comodo_geometria (polígonos por cômodo)."""
+    row = fetchone("SELECT 1 FROM sqlite_master WHERE type='table' AND name='comodo_geometria'")
+    if row:
+        return
+    from pathlib import Path
+    sql = (Path(__file__).parent.parent / "db" / "migrations" / "002_geometria.sql").read_text()
+    with __import__("hemera.database", fromlist=["get_connection"]).get_connection() as conn:
+        for stmt in sql.split(";"):
+            s = stmt.strip()
+            if s:
+                try:
+                    conn.execute(s)
+                except Exception:
+                    pass
+
 
 def listar_sensores_layout() -> list[dict]:
     rows = fetchall("""
@@ -128,4 +172,7 @@ def listar_dispositivos_layout() -> list[dict]:
     for r in rows:
         r["kind"] = "dispositivo"
         r["svg_id"] = None
+        if r["pos_x"] is None or r["pos_y"] is None:
+            px, py = POSICOES_DISPOSITIVOS_PADRAO.get(r["id"], (120, 120))
+            r["pos_x"], r["pos_y"] = px, py
     return rows

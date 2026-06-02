@@ -3,7 +3,6 @@ import asyncio
 import logging
 
 from hemera.database import fetchall
-from hemera.planta_layout import CENTROS_COMODO
 
 log = logging.getLogger(__name__)
 
@@ -54,16 +53,6 @@ async def loop_poll_leituras() -> None:
                         "comodo": r["comodo"],
                         "comodo_id": r["comodo_id"],
                     })
-                    if r["sensor_tipo"] == "presenca":
-                        cx, cy = CENTROS_COMODO.get(r["comodo"], (400, 260))
-                        _ws_broadcast({
-                            "tipo": "morador_movimento",
-                            "morador_id": (r["comodo_id"] % 3) + 1,
-                            "comodo_id": r["comodo_id"],
-                            "comodo": r["comodo"],
-                            "x": cx,
-                            "y": cy,
-                        })
         except Exception as e:
             log.debug("poll leituras: %s", e)
 

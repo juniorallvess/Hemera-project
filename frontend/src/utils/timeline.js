@@ -19,6 +19,8 @@ export function formatTimelineItem(msg) {
     descricao = `${msg.sensor_tipo || 'sensor'} = ${(msg.valor || 0).toFixed(2)} @ ${msg.comodo || '?'}`;
   } else if (tipo === 'morador_movimento') {
     descricao = `Morador ${msg.morador_id} → ${msg.comodo || '?'}`;
+  } else if (tipo === 'comodo_estado') {
+    descricao = `${msg.comodo || 'cômodo'} ${msg.ocupado ? 'ocupado' : 'vazio'} • ${msg.presentes ?? 0} presente(s)`;
   } else {
     descricao = JSON.stringify(msg).slice(0, 80);
   }
@@ -31,5 +33,6 @@ export function timelineDotClass(tipo) {
   if (tipo === 'intervencao') return 'bg-primary-container border-2 border-primary';
   if (tipo === 'leitura') return 'bg-primary';
   if (tipo === 'morador_movimento') return 'bg-secondary';
+  if (tipo === 'comodo_estado') return 'bg-surface-container-high border-2 border-secondary';
   return 'bg-surface-variant border-2 border-primary';
 }
