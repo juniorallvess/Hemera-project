@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from hemera.routes import (
     moradores, leituras, intervencoes, consultas, ws,
     planta, simulador_ctrl, analises, geometria, avancado,
+    auth,
 )
 from hemera.routes.ws import broadcast_sync
 from hemera.intervencoes import registrar_ws_callback
@@ -28,6 +29,7 @@ SERVE_SPA = FRONTEND_DIST.is_dir() and (FRONTEND_DIST / "index.html").is_file()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    auth.criar_tabela_usuarios_se_nao_existe()
     aplicar_migracao_layout()
     aplicar_migracao_geometria()
     registrar_ws_callback(broadcast_sync)
@@ -55,6 +57,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Hemera", lifespan=lifespan)
 
 # Routers
+app.include_router(auth.router)
 app.include_router(moradores.router)
 app.include_router(leituras.router)
 app.include_router(intervencoes.router)
@@ -73,12 +76,21 @@ if SERVE_SPA and (FRONTEND_DIST / "assets").is_dir():
 elif (STATIC_DIR / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
 
+if SERVE_SPA and (FRONTEND_DIST / "vid").is_dir():
+    app.mount("/vid", StaticFiles(directory=FRONTEND_DIST / "vid"), name="vid")
+
 
 @app.get("/")
 async def index():
     if SERVE_SPA:
         return FileResponse(FRONTEND_DIST / "index.html")
-    return FileResponse(STATIC_DIR / "index.html")
+
+@app.get("/login")
+async def login_page():
+    if SERVE_SPA:
+        return FileResponse(FRONTEND_DIST / "login.html")
+    return FileResponse(STATIC_DIR / "login.html")
+
 
 
 # SPA catch-all — MUST stay last route registered in module.

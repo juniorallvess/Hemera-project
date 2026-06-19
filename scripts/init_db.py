@@ -23,18 +23,18 @@ def init_db() -> None:
     conn.execute("PRAGMA foreign_keys = ON")
 
     log.info("Aplicando schema.sql …")
-    conn.executescript(SCHEMA.read_text())
+    conn.executescript(SCHEMA.read_text(encoding='utf-8'))
 
     log.info("Aplicando seed.sql …")
-    conn.executescript(SEED.read_text())
+    conn.executescript(SEED.read_text(encoding='utf-8'))
 
     log.info("Aplicando fix_demo_data.sql …")
-    conn.executescript(FIX_DEMO_DATA.read_text())
+    conn.executescript(FIX_DEMO_DATA.read_text(encoding='utf-8'))
 
     mig = BASE_DIR / "db" / "migrations" / "001_layout.sql"
     if mig.exists():
         log.info("Aplicando migrations/001_layout.sql …")
-        for stmt in mig.read_text().split(";"):
+        for stmt in mig.read_text(encoding='utf-8').split(";"):
             s = stmt.strip()
             if s:
                 try:

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useToast } from './Toast';
 
 function nomeComodo(comodos, comodoId, fallback) {
   const c = comodos.find((x) => x.id === comodoId);
@@ -10,6 +11,7 @@ function ItemRow({ item, comodos, onSave, onDelete }) {
   const [py, setPy] = useState(item.pos_y ?? 0);
   const [salvando, setSalvando] = useState(false);
   const [apagando, setApagando] = useState(false);
+  const { confirm } = useToast();
 
   const sujo =
     Number(px) !== Number(item.pos_x ?? 0) ||
@@ -26,7 +28,8 @@ function ItemRow({ item, comodos, onSave, onDelete }) {
       item.kind === 'sensor'
         ? `Apagar sensor "${item.tipo_descricao || item.tipo}"? Todas as leituras associadas serão removidas.`
         : `Apagar dispositivo "${item.tipo_descricao || item.tipo}"?`;
-    if (!window.confirm(aviso)) return;
+    const confirmed = await confirm(aviso);
+    if (!confirmed) return;
     setApagando(true);
     await onDelete(item.id);
     // componente desmontado após remoção — não repor flag

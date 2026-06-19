@@ -16,12 +16,14 @@
   fill: #5b8fc7;
   stroke: #fff;
   stroke-width: 1.5;
+  transition: all 0.3s ease;
 }
 
 .device-dot {
   fill: #e08850;
   stroke: #fff;
   stroke-width: 1.5;
+  transition: all 0.3s ease;
 }
 
 .sensor-dot.ativo,
@@ -34,4 +36,86 @@
 .morador-marker {
   pointer-events: none;
   transition: transform 0.4s ease;
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes soft-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.animate-soft-pulse {
+  animation: soft-pulse 4s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d8d0c8;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #c0b8b0;
+}
+
+/* Focus visible improvements */
+*:focus-visible {
+  outline: 2px solid #c2652a;
+  outline-offset: 2px;
 }

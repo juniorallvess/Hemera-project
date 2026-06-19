@@ -1,34 +1,32 @@
+import { LayoutDashboard, Cpu, Database, History, Edit3 } from 'lucide-react';
+
 const ITEMS = [
-  { id: 'overview', icon: 'dashboard', label: 'Visão geral', section: 'section-planta', filled: true },
-  { id: 'sensors', icon: 'sensors', label: 'Sensores', section: 'section-planta' },
-  { id: 'avancado', icon: 'storage', label: 'Avançado', section: 'section-queries' },
-  { id: 'history', icon: 'history', label: 'Histórico', section: 'section-events' },
-  { id: 'editor', icon: 'edit_square', label: 'Editor', section: '' },
+  { id: 'overview', icon: LayoutDashboard, label: 'Visão geral', section: 'section-planta' },
+  { id: 'sensors', icon: Cpu, label: 'Sensores', section: 'section-planta' },
+  { id: 'avancado', icon: Database, label: 'Avançado', section: 'section-queries' },
+  { id: 'history', icon: History, label: 'Histórico', section: 'section-events' },
+  { id: 'editor', icon: Edit3, label: 'Editor', section: '' },
 ];
 
 export default function BottomNav({ activeNav, onNavigate }) {
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 bg-surface-container-lowest/90 backdrop-blur-lg border-t border-outline-variant/40 shadow-[0_-2px_16px_rgba(58,48,42,0.04)] rounded-t-xl">
+    <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 bg-surface-container-lowest/95 backdrop-blur-lg border-t border-outline-variant/40 shadow-[0_-4px_20px_rgba(58,48,42,0.08)] rounded-t-2xl">
       {ITEMS.map((item) => {
         const active = activeNav === item.id;
+        const Icon = item.icon;
         return (
           <button
             key={item.id}
             type="button"
             onClick={() => onNavigate(item.id, item.section, item.query)}
-            className={`flex flex-col items-center justify-center p-2 min-w-[4.5rem] transition-all active:scale-95 ${
+            className={`flex flex-col items-center justify-center p-2.5 min-w-[4.5rem] transition-all duration-200 active:scale-95 group ${
               active
-                ? 'bg-primary-container text-on-primary-container rounded-xl'
+                ? 'bg-primary-container text-on-primary-container rounded-xl shadow-sm'
                 : 'text-on-secondary-fixed-variant hover:bg-secondary-container/50'
             }`}
           >
-            <span
-              className="material-symbols-outlined"
-              style={active && item.filled ? { fontVariationSettings: "'FILL' 1" } : undefined}
-            >
-              {item.icon}
-            </span>
-            <span className="font-label text-[10px] uppercase tracking-widest mt-1">
+            <Icon className={`w-5 h-5 transition-all duration-200 ${active ? 'scale-110' : 'group-hover:scale-105'}`} />
+            <span className="font-label text-[10px] uppercase tracking-widest mt-1 font-medium">
               {item.label}
             </span>
           </button>

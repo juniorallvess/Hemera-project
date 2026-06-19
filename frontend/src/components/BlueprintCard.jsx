@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Home, AlertCircle, Loader2, Pencil } from 'lucide-react';
 import AddItemPopup from './AddItemPopup';
 
 const PLANTA_URL = '/static/planta.svg';
@@ -159,42 +160,67 @@ export default function BlueprintCard({
   return (
     <section
       id="section-planta"
-      className="flex-1 bg-surface-container-lowest rounded-xl shadow-[0_2px_16px_rgba(58,48,42,0.04)] border border-outline-variant/30 relative overflow-hidden min-h-[400px] scroll-mt-24"
+      className="flex-1 bg-surface-container-lowest rounded-2xl shadow-[0_4px_32px_rgba(194,101,42,0.08)] border border-outline-variant/30 relative overflow-hidden min-h-[400px] scroll-mt-24 transition-all duration-300"
     >
-      {editMode && (
-        <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
-          <span className="px-2 py-1 rounded-full bg-primary text-on-primary text-xs font-bold">
-            Modo edição
-          </span>
-          <span className="text-xs text-on-surface-variant opacity-70">clique na planta para adicionar</span>
+      {/* Card Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant/20">
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary/10">
+            <Home className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-headline text-base font-semibold text-on-surface leading-tight">
+              Planta da Residência
+            </h3>
+            <p className="text-[11px] text-on-surface-variant font-medium">
+              {status === 'loading' ? 'Carregando…' : status === 'error' ? 'Erro ao carregar' : 'Visualização ao vivo'}
+            </p>
+          </div>
         </div>
-      )}
 
-      <div className="absolute inset-0 dot-pattern opacity-40 pointer-events-none" />
+        {editMode && (
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-on-primary text-xs font-semibold shadow-sm">
+              <Pencil className="w-3 h-3" />
+              Modo edição
+            </span>
+            <span className="text-xs text-on-surface-variant opacity-60 font-medium hidden sm:block">
+              clique para adicionar
+            </span>
+          </div>
+        )}
+      </div>
 
+      {/* Dot pattern bg */}
+      <div className="absolute inset-0 dot-pattern opacity-30 pointer-events-none" />
+
+      {/* Loading */}
       {status === 'loading' && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3">
-          <span className="material-symbols-outlined text-5xl text-outline opacity-50 animate-pulse">
-            architecture
-          </span>
-          <p className="font-body text-sm text-on-surface-variant">Carregando planta…</p>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-surface-container-lowest/70 backdrop-blur-sm">
+          <div className="relative">
+            <img src="/static/logo.png" alt="" className="w-16 h-16 object-contain animate-soft-pulse opacity-60" />
+            <Loader2 className="absolute -bottom-1 -right-1 w-5 h-5 text-primary animate-spin" />
+          </div>
+          <p className="font-body text-sm text-on-surface-variant font-medium">Carregando planta…</p>
         </div>
       )}
 
+      {/* Error */}
       {status === 'error' && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-6 text-center">
-          <span className="material-symbols-outlined text-5xl text-error opacity-80">
-            broken_image
-          </span>
-          <p className="font-body text-sm text-on-surface-variant">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 px-6 text-center bg-surface-container-lowest/70 backdrop-blur-sm">
+          <div className="w-16 h-16 rounded-2xl bg-error-container flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-error" />
+          </div>
+          <p className="font-body text-sm text-on-surface-variant max-w-md">
             Não foi possível carregar a planta. Confirme que o backend está em execução.
           </p>
         </div>
       )}
 
+      {/* SVG Container */}
       <div
         ref={containerRef}
-        className={`relative z-[1] w-full p-4 flex items-center justify-center ${
+        className={`relative z-[1] w-full p-4 flex items-center justify-center transition-opacity duration-500 ${
           status === 'ready' ? 'opacity-100' : 'opacity-0'
         }`}
         aria-label="Planta da casa"

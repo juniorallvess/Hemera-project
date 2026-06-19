@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import AnalisesPanel from './components/AnalisesPanel';
 import MapaEditor from './components/MapaEditor';
 import AppHeader from './components/AppHeader';
@@ -10,6 +10,8 @@ import AvancadoPanel from './components/AvancadoPanel';
 import SensorList from './components/SensorList';
 import SettingsDrawer from './components/SettingsDrawer';
 import SideNav from './components/SideNav';
+// AuthScreen replaced by /login page
+import { ToastProvider } from './components/Toast';
 import { useCounters } from './hooks/useCounters';
 import { usePlanta } from './hooks/usePlanta';
 import { useQueries } from './hooks/useQueries';
@@ -23,11 +25,37 @@ import {
 } from './utils/timeline';
 
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [authChecking, setAuthChecking] = useState(true);
   const [timelineItems, setTimelineItems] = useState([]);
   const [activeNav, setActiveNav] = useState('overview');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [plantaReload, setPlantaReload] = useState(0);
+
+  useEffect(() => {
+    fetch('/api/auth/session')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.logged_in) {
+          setUser(data.username);
+        }
+        setAuthChecking(false);
+      })
+      .catch(() => {
+        setAuthChecking(false);
+      });
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+    // Redireciona para a nova tela de login animada
+    window.location.href = '/login';
+  }, []);
 
   const { onPlantaReady, aplicarLayout, adicionarItem, atualizarPlanta } = usePlanta();
   const {
@@ -123,95 +151,112 @@ export default function App() {
     [uploadPlanta],
   );
 
+  if (authChecking) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-background text-primary">
+        <span className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></span>
+      </div>
+    );
+  }
+
+  if (!user) {
+    // Redireciona para a nova tela de login animada
+    window.location.href = '/login';
+    return null;
+  }
+
   return (
-    <div className="bg-background text-on-background font-body min-h-screen flex flex-col md:flex-row antialiased">
-      <SideNav activeNav={activeNav} onNavigate={handleNavigate} />
-      <main className="flex-1 md:ml-64 flex flex-col min-h-screen pb-24 md:pb-0">
-        <AppHeader
-          connected={connected}
-          metrics={{ leituras, desvios, intervencoes, ultimaAtualizacao }}
-          simStatus={simStatus}
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
-        <div className="flex-1 p-6 lg:p-10 flex flex-col xl:flex-row gap-8">
-          <div className="flex-1 flex flex-col gap-8 min-w-0">
-            {activeView === 'overview' && (
-              <>
-                <BlueprintCard
-                  onPlantaReady={onPlantaReady}
-                  aplicarLayout={aplicarLayout}
-                  layout={layout}
-                  dispositivosLayout={dispositivosLayout}
-                  editMode={editMode}
-                  onSensorMove={handleSensorMove}
-                  onDispositivoMove={handleDispositivoMove}
-                  onAddItem={handleAddItem}
-                  tipos={tipos}
+    <ToastProvider>
+      <div className="bg-background text-on-background font-body min-h-screen flex flex-col md:flex-row antialiased">
+        <SideNav activeNav={activeNav} onNavigate={handleNavigate} onLogout={handleLogout} />
+        <main className="flex-1 md:ml-64 flex flex-col min-h-screen pb-24 md:pb-0">
+          <AppHeader
+            connected={connected}
+            metrics={{ leituras, desvios, intervencoes, ultimaAtualizacao }}
+            simStatus={simStatus}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onLogout={handleLogout}
+          />
+          <div className="flex-1 p-6 lg:p-10 flex flex-col xl:flex-row gap-8">
+            <div className="flex-1 flex flex-col gap-8 min-w-0">
+              {activeView === 'overview' && (
+                <>
+                  <BlueprintCard
+                    onPlantaReady={onPlantaReady}
+                    aplicarLayout={aplicarLayout}
+                    layout={layout}
+                    dispositivosLayout={dispositivosLayout}
+                    editMode={editMode}
+                    onSensorMove={handleSensorMove}
+                    onDispositivoMove={handleDispositivoMove}
+                    onAddItem={handleAddItem}
+                    tipos={tipos}
+                    comodos={comodos}
+                    reloadKey={plantaReload}
+                  />
+                  <MoradorList />
+                </>
+              )}
+
+              {activeView === 'analytics' && (
+                <AnalisesPanel />
+              )}
+
+              {activeView === 'sensors' && (
+                <SensorList
+                  sensores={layout}
+                  dispositivos={dispositivosLayout}
                   comodos={comodos}
-                  reloadKey={plantaReload}
+                  onSaveSensor={handleSensorMove}
+                  onSaveDispositivo={handleDispositivoMove}
+                  onDeleteSensor={handleDeleteSensor}
+                  onDeleteDispositivo={handleDeleteDispositivo}
+                  onOpenSettings={() => setSettingsOpen(true)}
                 />
-                <MoradorList />
-              </>
-            )}
+              )}
 
-            {activeView === 'analytics' && (
-              <AnalisesPanel />
-            )}
+              {activeView === 'avancado' && (
+                <AvancadoPanel
+                  activeQuery={activeQuery}
+                  loading={loading}
+                  error={error}
+                  result={result}
+                  onSelectQuery={executarQuery}
+                />
+              )}
 
-            {activeView === 'sensors' && (
-              <SensorList
-                sensores={layout}
-                dispositivos={dispositivosLayout}
-                comodos={comodos}
-                onSaveSensor={handleSensorMove}
-                onSaveDispositivo={handleDispositivoMove}
-                onDeleteSensor={handleDeleteSensor}
-                onDeleteDispositivo={handleDeleteDispositivo}
-                onOpenSettings={() => setSettingsOpen(true)}
-              />
-            )}
+              {activeView === 'history' && (
+                <EventLog items={timelineItems} full />
+              )}
 
-            {activeView === 'avancado' && (
-              <AvancadoPanel
-                activeQuery={activeQuery}
-                loading={loading}
-                error={error}
-                result={result}
-                onSelectQuery={executarQuery}
-              />
-            )}
-
-            {activeView === 'history' && (
-              <EventLog items={timelineItems} full />
-            )}
-
-            {activeView === 'editor' && (
-              <MapaEditor reloadKey={plantaReload} />
+              {activeView === 'editor' && (
+                <MapaEditor reloadKey={plantaReload} />
+              )}
+            </div>
+            {(activeView === 'overview' || activeView === 'analytics' || activeView === 'avancado') && (
+              <EventLog items={timelineItems} />
             )}
           </div>
-          {(activeView === 'overview' || activeView === 'analytics' || activeView === 'avancado') && (
-            <EventLog items={timelineItems} />
-          )}
-        </div>
-      </main>
-      <BottomNav activeNav={activeNav} onNavigate={handleNavigate} />
-      <SettingsDrawer
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        simStatus={simStatus}
-        simLoading={simLoading}
-        plantaFonte={plantaInfo.fonte}
-        editMode={editMode}
-        onToggleEdit={() => setEditMode((v) => !v)}
-        onUploadPlanta={handleUploadPlanta}
-        onIniciarAoVivo={() =>
-          iniciar({ modo: 'ao_vivo', cenario: 'luto', velocidade: 3, dias: 1 })
-        }
-        onIniciarBatch={() =>
-          iniciar({ modo: 'batch', cenario: 'luto', dias: 30, velocidade: 1440 })
-        }
-        onPararSim={parar}
-      />
-    </div>
+        </main>
+        <BottomNav activeNav={activeNav} onNavigate={handleNavigate} />
+        <SettingsDrawer
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          simStatus={simStatus}
+          simLoading={simLoading}
+          plantaFonte={plantaInfo.fonte}
+          editMode={editMode}
+          onToggleEdit={() => setEditMode((v) => !v)}
+          onUploadPlanta={handleUploadPlanta}
+          onIniciarAoVivo={() =>
+            iniciar({ modo: 'ao_vivo', cenario: 'luto', velocidade: 3, dias: 1 })
+          }
+          onIniciarBatch={() =>
+            iniciar({ modo: 'batch', cenario: 'luto', dias: 30, velocidade: 1440 })
+          }
+          onPararSim={parar}
+        />
+      </div>
+    </ToastProvider>
   );
 }
